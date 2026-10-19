@@ -16,6 +16,10 @@ Online EXIF removers require uploading your original photos — do you really wa
 ## Install
 
 ```bash
+pip install -r requirements.txt
+```
+
+```bash
 pip install pillow
 # run directly, or:
 pip install .
