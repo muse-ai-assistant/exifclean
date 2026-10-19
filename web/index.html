@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>EXIF 清除 · 发图前保护隐私</title>
+<meta name="description" content="发照片前一键清除 EXIF（GPS 位置、设备信息）。纯前端处理，照片不出设备。Remove EXIF metadata before sharing photos. 100% on-device.">
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#059669">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#f0fdf4;--card:#fff;--ink:#1f2937;--mut:#6b7280;--line:#d1fae5;--acc:#059669;--acc-d:#047857;--warn:#d97706;--warn-bg:#fffbeb;--ok-bg:#ecfdf5}
+body{font-family:-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;-webkit-tap-highlight-color:transparent}
+.wrap{max-width:640px;margin:0 auto;padding:16px 14px 80px}
+.topbar{display:flex;justify-content:space-between;align-items:center;padding:6px 2px 12px}
+.topbar h1{font-size:1.25rem;letter-spacing:.06em}
+.topbar h1 span{color:var(--acc)}
+#langBtn{border:1px solid var(--line);background:#fff;border-radius:20px;padding:7px 16px;font-size:.82rem;color:var(--acc-d);font-weight:600;cursor:pointer}
+.shield{background:var(--ok-bg);border:1.5px solid #6ee7b7;border-radius:14px;padding:14px 16px;font-size:.9rem;line-height:1.6;margin-bottom:14px;display:flex;gap:10px;align-items:flex-start}
+.shield .ic{font-size:1.5rem;flex:none}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 2px 8px rgba(5,150,105,.06)}
+.pickrow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.pick{border:2px dashed #6ee7b7;border-radius:14px;background:#f0fdf4;text-align:center;padding:30px 10px;cursor:pointer;transition:.15s}
+.pick:active{transform:scale(.97);background:#dcfce7}
+.pick .big{font-size:2.4rem}
+.pick p{margin-top:8px;font-weight:600;color:var(--acc-d);font-size:.95rem}
+.pick small{color:var(--mut);font-size:.72rem}
+input[type=file]{display:none}
+.actions{display:flex;gap:10px;margin-top:14px}
+.btn{flex:1;border:none;border-radius:12px;padding:15px;font-size:1rem;font-weight:700;cursor:pointer;letter-spacing:.05em;min-height:52px}
+.btn-p{background:var(--acc);color:#fff;box-shadow:0 4px 12px rgba(5,150,105,.3)}
+.btn-p:active{background:var(--acc-d)}
+.btn-g{background:#fff;color:var(--acc-d);border:1.5px solid #6ee7b7;flex:.6}
+.btn:disabled{opacity:.4;cursor:default;box-shadow:none}
+.item{display:flex;gap:12px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+.item:first-child{border-top:none}
+.thumb{width:64px;height:64px;object-fit:cover;border-radius:10px;border:1px solid var(--line);flex:none;background:#f3f4f6}
+.meta{flex:1;min-width:0}
+.meta .nm{font-size:.82rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.badge{display:inline-block;font-size:.7rem;border-radius:6px;padding:3px 8px;margin-top:6px;font-weight:600}
+.b-warn{background:var(--warn-bg);color:var(--warn);border:1px solid #fde68a}
+.b-ok{background:var(--ok-bg);color:var(--acc-d);border:1px solid #a7f3d0}
+.b-mut{background:#f3f4f6;color:var(--mut);border:1px solid #e5e7eb}
+.dl{flex:none;font-size:.78rem;color:#fff;background:var(--acc);border:none;border-radius:8px;padding:9px 14px;cursor:pointer;font-weight:600;text-decoration:none;display:inline-block}
+.dl:active{background:var(--acc-d)}
+.rm{flex:none;border:none;background:none;color:#d1d5db;font-size:1.2rem;cursor:pointer;padding:6px}
+.stat{background:var(--ok-bg);border:1px solid #a7f3d0;border-radius:12px;padding:13px 16px;font-size:.88rem;margin-bottom:14px;text-align:center}
+.stat b{color:var(--acc-d)}
+.empty{text-align:center;color:var(--mut);padding:24px 0;font-size:.85rem}
+.note{font-size:.72rem;color:var(--mut);text-align:center;margin-top:10px;line-height:1.7}
+.prog{height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden;margin-top:8px}
+.prog i{display:block;height:100%;background:var(--acc);border-radius:3px;transition:width .2s}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <h1>EXIF <span data-i18n="title2">清除</span></h1>
+    <button id="langBtn">EN</button>
+  </div>
+
+  <div class="shield">
+    <div class="ic">🛡️</div>
+    <div data-i18n="privacy">照片只在你的设备上处理，<b>不会上传</b>到任何服务器。清除原理：重新绘制图片，EXIF 信息自然丢弃。</div>
+  </div>
+
+  <div class="card">
+    <div class="pickrow">
+      <div class="pick" id="pickBtn">
+        <div class="big">🖼️</div>
+        <p data-i18n="pick">选择照片</p>
+        <small data-i18n="pickSub">可多选</small>
+      </div>
+      <div class="pick" id="shootBtn">
+        <div class="big">📷</div>
+        <p data-i18n="shoot">拍照</p>
+        <small data-i18n="shootSub">直接拍摄</small>
+      </div>
+    </div>
+    <input type="file" id="filePick" accept="image/*" multiple>
+    <input type="file" id="fileShoot" accept="image/*" capture="environment">
+    <div class="actions">
+      <button class="btn btn-p" id="cleanBtn" disabled data-i18n="clean">一键清除 EXIF</button>
+      <button class="btn btn-g" id="clearBtn" data-i18n="clear">清空</button>
+    </div>
+    <div class="note" data-i18n="note">输出为重新编码的图片（JPEG/PNG），画质几乎无损，EXIF 已彻底清除并经程序复验。</div>
+  </div>
+
+  <div class="card" id="listCard" style="display:none">
+    <div class="stat" id="statBar" style="display:none"></div>
+    <div id="list"></div>
+    <div class="actions" id="zipRow" style="display:none">
+      <button class="btn btn-p" id="zipBtn" data-i18n="zipAll">⬇ 下载全部 (.zip)</button>
+    </div>
+  </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+'use strict';
+/* ---------- i18n ---------- */
+const I18N = {
+  zh: {
+    title2: '清除', privacy: '照片只在你的设备上处理，<b>不会上传</b>到任何服务器。清除原理：重新绘制图片，EXIF 信息自然丢弃。',
+    pick: '选择照片', pickSub: '可多选', shoot: '拍照', shootSub: '直接拍摄',
+    clean: '一键清除 EXIF', clear: '清空',
+    note: '输出为重新编码的图片（JPEG/PNG），画质几乎无损，EXIF 已彻底清除并经程序复验。',
+    zipAll: '⬇ 下载全部 (.zip)',
+    empty: '还没有选择照片', hasGps: '⚠️ 含位置信息', hasDev: '含设备信息', noExif: '无 EXIF',
+    cleaned: '✓ 已清除', cleaning: '清除中…', download: '下载',
+    statDone: n => `已清除 <b>${n}</b> 张照片的 EXIF`,
+    zipNoLib: 'ZIP 组件加载失败，已改为逐张下载',
+    cnt: n => `${n} 张照片`
+  },
+  en: {
+    title2: 'Cleaner', privacy: 'Photos are processed <b>only on your device</b> and never uploaded to any server. How it works: the image is redrawn, so EXIF data is naturally dropped.',
+    pick: 'Choose photos', pickSub: 'multiple OK', shoot: 'Take photo', shootSub: 'use camera',
+    clean: 'Clean EXIF in one tap', clear: 'Clear',
+    note: 'Output is a re-encoded image (JPEG/PNG) with negligible quality loss; EXIF is fully removed and verified by the app.',
+    zipAll: '⬇ Download all (.zip)',
+    empty: 'No photos yet', hasGps: '⚠️ Contains location', hasDev: 'Contains device info', noExif: 'No EXIF',
+    cleaned: '✓ Cleaned', cleaning: 'Cleaning…', download: 'Save',
+    statDone: n => `EXIF removed from <b>${n}</b> photos`,
+    zipNoLib: 'ZIP library failed to load, downloading files one by one',
+    cnt: n => `${n} photo(s)`
+  }
+};
+let lang = localStorage.getItem('exifclean-lang') || 'zh';
+const t = k => I18N[lang][k];
+function applyLang() {
+  document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const v = t(el.dataset.i18n);
+    if (typeof v === 'string') el.innerHTML = v;
+  });
+  document.getElementById('langBtn').textContent = lang === 'zh' ? 'EN' : '中文';
+  render();
+}
+document.getElementById('langBtn').onclick = () => {
+  lang = lang === 'zh' ? 'en' : 'zh';
+  localStorage.setItem('exifclean-lang', lang);
+  applyLang();
+};
+
+/* ---------- minimal EXIF parser (JPEG APP1/TIFF) ---------- */
+function parseExif(buf) {
+  const dv = new DataView(buf);
+  const res = { hasExif: false, make: null, model: null, datetime: null, gps: null };
+  if (dv.byteLength < 4 || dv.getUint16(0) !== 0xFFD8) return res;
+  let off = 2;
+  while (off + 4 <= dv.byteLength) {
+    if (dv.getUint8(off) !== 0xFF) break;
+    const marker = dv.getUint8(off + 1), len = dv.getUint16(off + 2);
+    if (marker === 0xE1 && len > 8 &&
+        dv.getUint32(off + 4) === 0x45786966 && dv.getUint16(off + 8) === 0) {
+      parseTiff(dv, off + 10, res);
+      res.hasExif = true;
+      break;
+    }
+    if (marker === 0xDA || marker === 0xD9) break;
+    off += 2 + len;
+  }
+  return res;
+}
+function parseTiff(dv, base, res) {
+  const bo = dv.getUint16(base), le = bo === 0x4949;
+  if (!le && bo !== 0x4D4D) return;
+  const u16 = o => dv.getUint16(o, le), u32 = o => dv.getUint32(o, le);
+  if (u16(base + 2) !== 42) return;
+  const TSZ = { 1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 7: 1, 9: 4, 10: 8 };
+  function val(e, type, count) {
+    const sz = (TSZ[type] || 1) * count;
+    const vp = sz <= 4 ? e + 8 : base + u32(e + 8);
+    if (vp + sz > dv.byteLength) return null;
+    if (type === 2) {
+      let s = '';
+      for (let i = 0; i < count; i++) { const c = dv.getUint8(vp + i); if (!c) break; s += String.fromCharCode(c); }
+      return s.trim() || null;
+    }
+    if (type === 5) {
+      const r = i => { const n = u32(vp + i * 8), d = u32(vp + i * 8 + 4); return d ? n / d : 0; };
+      return count === 1 ? r(0) : [r(0), r(1), r(2)];
+    }
+    if (type === 3) return u16(vp);
+    if (type === 4) return u32(vp);
+    return null;
+  }
+  function ifd(ifdOff, tags) {
+    const n = u16(base + ifdOff), out = {};
+    for (let i = 0; i < n; i++) {
+      const e = base + ifdOff + 2 + i * 12;
+      if (e + 12 > dv.byteLength) break;
+      const tag = u16(e);
+      if (tags.indexOf(tag) >= 0) out[tag] = val(e, u16(e + 2), u32(e + 4));
+    }
+    return out;
+  }
+  const i0 = ifd(u32(base + 4), [0x010F, 0x0110, 0x0132, 0x8769, 0x8825]);
+  res.make = i0[0x010F] || null;
+  res.model = i0[0x0110] || null;
+  res.datetime = i0[0x0132] || null;
+  if (i0[0x8769]) {
+    const ex = ifd(i0[0x8769], [0x9003]);
+    if (ex[0x9003]) res.datetime = ex[0x9003];
+  }
+  if (i0[0x8825]) {
+    const g = ifd(i0[0x8825], [0x0001, 0x0002, 0x0003, 0x0004]);
+    if (Array.isArray(g[0x0002]) && Array.isArray(g[0x0004])) {
+      let lat = g[0x0002][0] + g[0x0002][1] / 60 + g[0x0002][2] / 3600;
+      let lon = g[0x0004][0] + g[0x0004][1] / 60 + g[0x0004][2] / 3600;
+      if (g[0x0001] === 'S') lat = -lat;
+      if (g[0x0003] === 'W') lon = -lon;
+      res.gps = { lat: +lat.toFixed(6), lon: +lon.toFixed(6) };
+    }
+  }
+}
+
+/* ---------- app state ---------- */
+const items = []; // {file, url, exif, blob, outUrl, done}
+const $ = id => document.getElementById(id);
+
+$('pickBtn').onclick = () => $('filePick').click();
+$('shootBtn').onclick = () => $('fileShoot').click();
+$('filePick').onchange = e => addFiles(e.target.files);
+$('fileShoot').onchange = e => addFiles(e.target.files);
+
+async function addFiles(files) {
+  for (const f of files) {
+    if (!f.type.startsWith('image/')) continue;
+    const buf = await f.arrayBuffer();
+    const exif = parseExif(buf);
+    items.push({ file: f, url: URL.createObjectURL(f), exif, blob: null, outUrl: null, done: false });
+  }
+  $('filePick').value = ''; $('fileShoot').value = '';
+  render();
+}
+
+function badge(it) {
+  if (it.done) return `<span class="badge b-ok">${t('cleaned')}</span>`;
+  const e = it.exif;
+  if (e.gps) return `<span class="badge b-warn">${t('hasGps')}</span>`;
+  if (e.make || e.model) return `<span class="badge b-warn">${t('hasDev')}</span>`;
+  if (e.hasExif) return `<span class="badge b-warn">EXIF</span>`;
+  return `<span class="badge b-mut">${t('noExif')}</span>`;
+}
+
+function render() {
+  const list = $('list'), card = $('listCard');
+  if (!items.length) { card.style.display = 'none'; $('cleanBtn').disabled = true; return; }
+  card.style.display = 'block';
+  $('cleanBtn').disabled = items.every(i => i.done);
+  list.innerHTML = items.map((it, i) => `
+    <div class="item">
+      <img class="thumb" src="${it.url}" alt="">
+      <div class="meta">
+        <div class="nm">${esc(it.file.name)}</div>
+        ${badge(it)}
+        ${it.done ? `<div class="prog"><i style="width:100%"></i></div>` : ''}
+      </div>
+      ${it.done ? `<a class="dl" href="${it.outUrl}" download="${esc(it.outName)}">${t('download')}</a>` : ''}
+      <button class="rm" data-i="${i}" aria-label="remove">×</button>
+    </div>`).join('');
+  list.querySelectorAll('.rm').forEach(b => b.onclick = () => {
+    const it = items[+b.dataset.i];
+    URL.revokeObjectURL(it.url);
+    if (it.outUrl) URL.revokeObjectURL(it.outUrl);
+    items.splice(+b.dataset.i, 1);
+    render();
+  });
+  const doneN = items.filter(i => i.done).length;
+  $('statBar').style.display = doneN ? 'block' : 'none';
+  if (doneN) $('statBar').innerHTML = t('statDone')(doneN);
+  $('zipRow').style.display = doneN > 1 ? 'flex' : 'none';
+}
+const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+$('clearBtn').onclick = () => {
+  items.forEach(it => { URL.revokeObjectURL(it.url); if (it.outUrl) URL.revokeObjectURL(it.outUrl); });
+  items.length = 0; render();
+};
+
+function loadImage(url) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => res(img); img.onerror = rej;
+    img.src = url;
+  });
+}
+
+$('cleanBtn').onclick = async () => {
+  $('cleanBtn').disabled = true;
+  for (const it of items) {
+    if (it.done) continue;
+    try {
+      const img = await loadImage(it.url);
+      const c = document.createElement('canvas');
+      c.width = img.naturalWidth; c.height = img.naturalHeight;
+      c.getContext('2d').drawImage(img, 0, 0);
+      const isPng = it.file.type === 'image/png';
+      const mime = isPng ? 'image/png' : 'image/jpeg';
+      const blob = await new Promise(r => c.toBlob(r, mime, 0.92));
+      // verify: re-parse output, EXIF must be gone
+      const check = parseExif(await blob.arrayBuffer());
+      if (check.hasExif) throw new Error('verify-failed');
+      const ext = isPng ? '.png' : '.jpg';
+      it.outName = it.file.name.replace(/\.[^.]+$/, '') + '_clean' + ext;
+      it.blob = blob;
+      it.outUrl = URL.createObjectURL(blob);
+      it.done = true;
+    } catch (e) {
+      it.done = false;
+    }
+    render();
+  }
+  render();
+};
+
+$('zipBtn').onclick = async () => {
+  const done = items.filter(i => i.done);
+  if (window.JSZip) {
+    const zip = new JSZip();
+    for (const it of done) zip.file(it.outName, it.blob);
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'exifcleaned.zip';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  } else {
+    alert(t('zipNoLib'));
+    done.forEach((it, i) => setTimeout(() => {
+      const a = document.createElement('a');
+      a.href = it.outUrl; a.download = it.outName; a.click();
+    }, i * 600));
+  }
+};
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+}
+applyLang();
+</script>
+</body>
+</html>
