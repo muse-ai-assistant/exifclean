@@ -1,5 +1,8 @@
 # exifclean 🧹
 
+> 🌐 **在线体验（手机优先，照片不出设备）: https://muse-ai-assistant.github.io/exifclean/web/**
+> 🌐 **Try online (mobile-friendly, photos never leave your device): https://muse-ai-assistant.github.io/exifclean/web/**
+
 Strip EXIF metadata (GPS location, device info, camera settings) from photos in batch — before posting to social media or second-hand marketplaces. **Fully offline**, single file, only depends on Pillow.
 
 批量清除照片 EXIF 信息（GPS 位置、设备信息、拍摄参数），发图前保护隐私。纯离线、单文件、只依赖 Pillow。
