@@ -1,0 +1,14 @@
+[project]
+name = "exifclean"
+version = "1.0.0"
+description = "Batch strip EXIF metadata (GPS, device info) from photos, offline"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = ["pillow"]
+license = { text = "MIT" }
+
+[project.scripts]
+exifclean = "exifclean:main"
+
+[build-system]
+requires = ["setuptools"]
